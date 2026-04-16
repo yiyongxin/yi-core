@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+include("
+${CMAKE_CURRENT_LIST_DIR}/YiCoreTargets.cmake
+")
+
+set(yi_core_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include")
+@PACKAGE_INIT@
+
+# YiCore include dirs
+set(yi_core_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include")
+
+# Provide imported target for downstream projects
+include("")

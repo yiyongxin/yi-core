@@ -1,28 +1,43 @@
-cmake_minimum_required(VERSION 3.14)
-project(yi_serialize CXX)
+cmake_minimum_required(VERSION 3.24)
+project(yi_core VERSION 0.0.1 LANGUAGES CXX)
 
-# JSON 序列化器使用 C++20 concepts
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# ── 头文件库（INTERFACE，无需编译产物）──────────────────────────────────────
-add_library(yi_serialize INTERFACE)
-add_library(yi::serialize ALIAS yi_serialize)
-
-target_include_directories(yi_serialize INTERFACE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-  $<INSTALL_INTERFACE:include>
+# Library target
+add_library(yi_core STATIC
+    src/placeholder.cpp
 )
 
-# RapidJSON（JSON 序列化器依赖）
-find_path(RAPIDJSON_INCLUDE_DIR rapidjson/document.h
-  HINTS /usr/local/include /usr/include
-  REQUIRED
+target_include_directories(yi_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
-target_include_directories(yi_serialize INTERFACE ${RAPIDJSON_INCLUDE_DIR})
 
-# ── 单元测试（仅当作为顶层项目构建时）──────────────────────────────────────
+add_library(yi::core ALIAS yi_core)
+
+# Packaging helpers
+include(CMakePackageConfigHelpers)
+
+# Export targets and generate config files when installing
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfigVersion.cmake"
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/YiCoreConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfig.cmake"
+  INSTALL_DESTINATION lib/cmake/yi_core
+)
+
+install(TARGETS yi_core EXPORT YiCoreTargets)
+install(EXPORT YiCoreTargets FILE YiCoreTargets.cmake DESTINATION lib/cmake/yi_core)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfigVersion.cmake" DESTINATION lib/cmake/yi_core)
+
+# Enable tests only when built as top-level project
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   include(CTest)
   enable_testing()

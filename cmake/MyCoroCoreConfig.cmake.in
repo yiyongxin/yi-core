@@ -1,4 +1,0 @@
-# Minimal exported config placeholder for yi_core
-@PACKAGE_INIT@
-
-set(YiCore_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include")

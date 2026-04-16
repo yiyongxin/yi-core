@@ -1,6 +1,6 @@
 #pragma once
 
-#include "serialize/binary.h" // IWYU pragma: keep
+#include "yi/core/serialize/binary.h" // IWYU pragma: keep
 
 namespace yi::example
 {
