@@ -24,7 +24,7 @@ inline bool read_number(BasicReader<BE,ENC>& reader, v_type& value)
     return false;
   const char* p = reader.buffer + reader.offset;
   if constexpr (BE)
-    value = *reinterpret_cast<const v_type*>(p);
+    value = assemble_be<v_type>(p);
   else
     value = assemble_le<v_type>(p);
   reader.offset += v_size;

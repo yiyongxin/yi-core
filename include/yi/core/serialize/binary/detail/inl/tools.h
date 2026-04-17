@@ -39,4 +39,36 @@ inline T assemble_le(const char* p) {
   }
 }
 
+// 从大端缓冲区读取值（高字节在前），同时也用于写入大端输出时的字节重排。
+template<typename T>
+inline T assemble_be(const char* p) {
+  if constexpr (sizeof(T) == 1) {
+    return static_cast<T>(p[0]);
+  } else if constexpr (sizeof(T) == 2) {
+    uint16_t u = (uint16_t(uint8_t(p[0])) << 8) | uint16_t(uint8_t(p[1]));
+    if constexpr (std::is_integral_v<T>)
+      return static_cast<T>(u);
+    else
+      return std::bit_cast<T>(u);
+  } else if constexpr (sizeof(T) == 4) {
+    uint32_t u =
+      (uint32_t(uint8_t(p[0])) << 24) | (uint32_t(uint8_t(p[1])) << 16) |
+      (uint32_t(uint8_t(p[2])) << 8)  |  uint32_t(uint8_t(p[3]));
+    if constexpr (std::is_integral_v<T>)
+      return static_cast<T>(u);
+    else
+      return std::bit_cast<T>(u);
+  } else if constexpr (sizeof(T) == 8) {
+    uint64_t u =
+      (uint64_t(uint8_t(p[0])) << 56) | (uint64_t(uint8_t(p[1])) << 48) |
+      (uint64_t(uint8_t(p[2])) << 40) | (uint64_t(uint8_t(p[3])) << 32) |
+      (uint64_t(uint8_t(p[4])) << 24) | (uint64_t(uint8_t(p[5])) << 16) |
+      (uint64_t(uint8_t(p[6])) << 8)  |  uint64_t(uint8_t(p[7]));
+    if constexpr (std::is_integral_v<T>)
+      return static_cast<T>(u);
+    else
+      return std::bit_cast<T>(u);
+  }
+}
+
 }

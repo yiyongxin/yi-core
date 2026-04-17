@@ -26,7 +26,7 @@ inline bool write_number(BasicWriter<BE,ENC>& writer, const v_type& value)
     return false;
   char* p = writer.buffer + writer.offset;
   if constexpr (BE)
-    *reinterpret_cast<v_type*>(p) = value;
+    *reinterpret_cast<v_type*>(p) = assemble_be<v_type>(reinterpret_cast<const char*>(&value));
   else
     *reinterpret_cast<v_type*>(p) = assemble_le<v_type>(reinterpret_cast<const char*>(&value));
   writer.offset += v_size;

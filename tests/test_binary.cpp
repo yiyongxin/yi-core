@@ -1,5 +1,53 @@
+// 二进制序列化单元测试
+//
+// BinarySize
+//   ScalarTypes          — uint8/16/32/64、int8/16/32/64、float、double 的 size() 返回值
+//   StdString            — 空字符串和非空字符串的 size()（含 4 字节长度前缀）
+//   StdVector            — 空向量、uint32_t 向量、string 向量的 size()
+//
+// BinaryRoundTrip
+//   UInt8/16/32/64       — 无符号整型写入再读回，值与字节数正确
+//   Int8/16/32/64        — 有符号整型写入再读回，含边界值
+//   Float_LE             — float 小端往返，含最大/最小值
+//   Double_LE            — double 小端往返，含最大/最小值
+//   FloatWritesByteCount — float 写入恰好消耗 4 字节
+//   DoubleWritesByteCount— double 写入恰好消耗 8 字节
+//   FloatZeroRoundTrip   — 0.0f 特殊位模式往返
+//   DoubleZeroRoundTrip  — 0.0 特殊位模式往返
+//   StdStringEmpty       — 空字符串往返，写入 4 字节
+//   StdStringNormal      — 普通字符串往返
+//   StdStringWithSpaces  — 含空格字符串往返
+//   StdStringLong        — 512 字节长字符串往返
+//   VectorEmpty          — 空向量往返，写入 4 字节
+//   VectorUInt32         — uint32_t 向量往返
+//   VectorInt32Negative  — 含负数的 int32_t 向量往返
+//   VectorStrings        — string 向量往返
+//   NestedVector         — vector<vector<int32_t>> 嵌套往返
+//   CustomStruct_Point   — 自定义结构体 Point（含手动重载）往返
+//   CustomStruct_Packet  — 自定义结构体 Packet（含字符串字段）往返
+//   VectorOfStructs      — Point 向量往返
+//
+// BinaryOverflow
+//   WriteFailsOnTooSmallBuffer   — 缓冲区不足时 write 返回 false，offset 不前进
+//   WriteExactFit                — 恰好填满缓冲区时 write 成功
+//   WriteStringTooLong           — 字符串数据超出缓冲区时 write 失败
+//   WriteStringLengthPrefixFits  — 连长度前缀都放不下时 write 失败
+//   ReadFailsOnTruncatedBuffer   — 缓冲区截断时 read 返回 false
+//   ReadStringDataTruncated      — 字符串数据不完整时 read 失败
+//   MultipleWritesExhaustBuffer  — 连续写入耗尽缓冲区后再写入失败
+//
+// BinaryEndian
+//   UInt16LittleEndian           — uint16_t 小端字节序验证
+//   UInt32LittleEndian           — uint32_t 小端字节序验证
+//   UInt64LittleEndian           — uint64_t 小端字节序验证
+//   StringLengthPrefixLittleEndian — 字符串长度前缀小端写入验证
+//
+// BinaryOffset
+//   OffsetAdvancesCorrectly      — Writer.offset 随每次写入正确递增
+//   ReaderOffsetAdvancesCorrectly— Reader.offset 随每次读取正确递增
+
 #include <gtest/gtest.h>
-#include "serialize/binary/binary.h"
+#include "yi/core/serialize/binary/binary.h"
 
 #include <cstdint>
 #include <limits>
@@ -199,19 +247,10 @@ TEST(BinaryRoundTrip, Int64)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 浮点型 – 写入/读取往返
-//
-// 已知 BUG（src/serialize/binary/detail/inl/tools.h）：
-//   assemble_le<T> 使用 static_cast<T>(uint_value) 转换结果，
-//   对整数类型没有问题，但对 float/double 会执行数值转换而非位重解释，
-//   导致 LE 模式（is_big_endian=false，默认值）下浮点往返错误。
-//   修复方式：将 static_cast 替换为 std::bit_cast 或 memcpy。
-//
-// 下面的两个 DISABLED 测试记录了"应该正确通过"的规格，
-// 待 assemble_le 修复后可去掉 DISABLED_ 前缀。
+// assemble_le 已改用 std::bit_cast，float/double LE 模式往返正确。
 // ═══════════════════════════════════════════════════════════════════════════
 
-// DISABLED：float LE 模式往返因 assemble_le bug 失败，见上方说明
-TEST(BinaryRoundTrip, DISABLED_Float_LE)
+TEST(BinaryRoundTrip, Float_LE)
 {
     for (float v : {0.0f, 1.0f, -1.5f, 3.14159f,
                     std::numeric_limits<float>::max(),
@@ -224,8 +263,7 @@ TEST(BinaryRoundTrip, DISABLED_Float_LE)
     }
 }
 
-// DISABLED：double LE 模式往返因 assemble_le bug 失败，见上方说明
-TEST(BinaryRoundTrip, DISABLED_Double_LE)
+TEST(BinaryRoundTrip, Double_LE)
 {
     for (double v : {0.0, 1.0, -1.5, 3.14159265358979,
                      std::numeric_limits<double>::max(),
@@ -542,7 +580,6 @@ TEST(BinaryEndian, UInt16LittleEndian)
     Writer w;
     w.buffer = buf;
     w.length  = 2;
-    w.is_big_endian = false;
 
     EXPECT_TRUE(write(w, uint16_t{0x0102}));
     // 小端：低字节在前
@@ -556,7 +593,6 @@ TEST(BinaryEndian, UInt32LittleEndian)
     Writer w;
     w.buffer = buf;
     w.length  = 4;
-    w.is_big_endian = false;
 
     EXPECT_TRUE(write(w, uint32_t{0x01020304u}));
     EXPECT_EQ(byte_at(buf, 0), 0x04u);
@@ -571,7 +607,6 @@ TEST(BinaryEndian, UInt64LittleEndian)
     Writer w;
     w.buffer = buf;
     w.length  = 8;
-    w.is_big_endian = false;
 
     EXPECT_TRUE(write(w, uint64_t{0x0102030405060708ull}));
     EXPECT_EQ(byte_at(buf, 0), 0x08u);
@@ -590,7 +625,6 @@ TEST(BinaryEndian, StringLengthPrefixLittleEndian)
     Writer w;
     w.buffer = buf;
     w.length  = sizeof(buf);
-    w.is_big_endian = false;
 
     // 字符串 "ABCDE" 长度 5，长度前缀用 uint32_t LE 写入
     EXPECT_TRUE(write(w, std::string{"ABCDE"}));
@@ -600,6 +634,381 @@ TEST(BinaryEndian, StringLengthPrefixLittleEndian)
     EXPECT_EQ(byte_at(buf, 3), 0x00u);
     EXPECT_EQ(buf[4], 'A');
     EXPECT_EQ(buf[8], 'E');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 特殊类型：vstr / fstr / vec<T,N> / std::array
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── vstr：自定义长度前缀的变长字符串 ────────────────────────────────────────
+
+TEST(BinarySpecialTypes, VstrSize_1b)
+{
+    str1b s;
+    s.assign("hi");
+    EXPECT_EQ(size(s), sizeof(uint8_t) + 2u);  // 1字节前缀 + 2字节数据
+
+    str1b empty;
+    EXPECT_EQ(size(empty), sizeof(uint8_t));
+}
+
+TEST(BinarySpecialTypes, VstrSize_2b)
+{
+    str2b s;
+    s.assign("hello");
+    EXPECT_EQ(size(s), sizeof(uint16_t) + 5u);
+}
+
+TEST(BinarySpecialTypes, VstrRoundTrip_1b)
+{
+    str1b in;
+    in.assign("binary");
+
+    char buf[64] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 1u + 6u);  // 1字节前缀 + 6字节数据
+
+    str1b out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(std::string(out), std::string(in));
+}
+
+TEST(BinarySpecialTypes, VstrRoundTrip_2b)
+{
+    str2b in;
+    in.assign("hello world");
+
+    char buf[64] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 2u + 11u);
+
+    str2b out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(std::string(out), std::string(in));
+}
+
+// ── fstr：定长字符串（编译期大小） ──────────────────────────────────────────
+
+TEST(BinarySpecialTypes, FstrSize)
+{
+    fstr<4>  f4;
+    fstr<16> f16;
+    EXPECT_EQ(size(f4),  4u);
+    EXPECT_EQ(size(f16), 16u);
+}
+
+TEST(BinarySpecialTypes, FstrRoundTrip)
+{
+    fstr<8> in;
+    in.assign("YICP");  // 4字节内容，剩余 4 字节填零
+
+    char buf[8] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 8u);
+
+    // 验证剩余字节确实补零
+    EXPECT_EQ(buf[4], '\0');
+    EXPECT_EQ(buf[5], '\0');
+
+    fstr<8> out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out.substr(0, 4), "YICP");
+}
+
+TEST(BinarySpecialTypes, FstrExactFit)
+{
+    fstr<5> in;
+    in.assign("hello");  // 恰好填满
+
+    char buf[5] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 5u);
+    EXPECT_EQ(buf[4], 'o');
+}
+
+// ── vec<T, length_type>：自定义 count 前缀的变长数组 ───────────────────────
+
+TEST(BinarySpecialTypes, VecCustomSize_1b)
+{
+    vec1b<uint32_t> v;
+    v.push_back(1u);
+    v.push_back(2u);
+    v.push_back(3u);
+    // 1字节 count 前缀 + 3 * 4字节数据
+    EXPECT_EQ(size(v), sizeof(uint8_t) + 3u * sizeof(uint32_t));
+
+    vec1b<uint32_t> empty;
+    EXPECT_EQ(size(empty), sizeof(uint8_t));
+}
+
+TEST(BinarySpecialTypes, VecCustomRoundTrip_1b)
+{
+    vec1b<int32_t> in;
+    in.push_back(10);
+    in.push_back(-20);
+    in.push_back(30);
+
+    char buf[64] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 1u + 3u * 4u);
+
+    // count 前缀验证：1字节 LE，值为 3
+    EXPECT_EQ(static_cast<uint8_t>(buf[0]), 3u);
+
+    vec1b<int32_t> out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out.size(), in.size());
+    for (size_t i = 0; i < in.size(); ++i)
+        EXPECT_EQ(out[i], in[i]);
+}
+
+TEST(BinarySpecialTypes, VecCustomRoundTrip_2b)
+{
+    vec2b<std::string> in;
+    in.push_back("foo");
+    in.push_back("bar");
+
+    char buf[256] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+
+    vec2b<std::string> out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out.size(), 2u);
+    EXPECT_EQ(out[0], "foo");
+    EXPECT_EQ(out[1], "bar");
+}
+
+// ── std::array：定长数组 ─────────────────────────────────────────────────────
+
+TEST(BinarySpecialTypes, ArraySize)
+{
+    std::array<int32_t, 4> a = {1, 2, 3, 4};
+    EXPECT_EQ(size(a), 4u * sizeof(int32_t));
+
+    std::array<float, 3> af = {};
+    EXPECT_EQ(size(af), 3u * sizeof(float));
+}
+
+TEST(BinarySpecialTypes, ArrayRoundTrip_Int32)
+{
+    std::array<int32_t, 4> in = {10, -20, 300, -4000};
+
+    char buf[64] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 4u * 4u);
+
+    std::array<int32_t, 4> out = {};
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out, in);
+}
+
+TEST(BinarySpecialTypes, ArrayRoundTrip_Float)
+{
+    std::array<float, 3> in = {1.0f, -2.5f, 3.14159f};
+
+    char buf[32] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 3u * 4u);
+
+    std::array<float, 3> out = {};
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out, in);
+}
+
+// ── 自定义类型与 vec / std::array 的组合 ────────────────────────────────────
+
+// 注：size(item) 在容器模板内部仅依赖 ADL，对自定义类型只搜索其所在命名空间
+// （test_types），而重载定义在 yi::serialize::binary，故容器级 size() 无法通过
+// ADL 找到。write/read 因 Writer/Reader 参数提供 ADL 桥梁，不受此限制。
+// 因此以下测试通过 w.offset 验证字节数，而非调用 size(container_of_custom)。
+
+TEST(BinarySpecialTypes, VecCustomStruct_Point)
+{
+    // vec1b<Point>：1字节 count 前缀 + 每个 Point 占 8 字节
+    vec1b<test_types::Point> in;
+    in.push_back({1, 2});
+    in.push_back({-3, 4});
+    in.push_back({0, -100});
+
+    // 验证单个元素 size() 正确（非模板上下文，ADL 可到达 yi::serialize::binary）
+    EXPECT_EQ(size(test_types::Point{}), 8u);
+
+    char buf[64] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 1u + 3u * 8u);  // 1字节前缀 + 3 * (4+4)
+
+    // count 前缀验证：1字节 LE，值为 3
+    EXPECT_EQ(static_cast<uint8_t>(buf[0]), 3u);
+
+    vec1b<test_types::Point> out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    ASSERT_EQ(out.size(), in.size());
+    for (size_t i = 0; i < in.size(); ++i)
+        EXPECT_EQ(out[i], in[i]) << "mismatch at index " << i;
+}
+
+TEST(BinarySpecialTypes, VecCustomStruct_Empty)
+{
+    // 空的 vec2b<Point>：只写 2 字节 count 前缀，值为 0
+    vec2b<test_types::Point> empty;
+
+    char buf[4] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, empty));
+    EXPECT_EQ(w.offset, 2u);  // 仅 uint16_t count 前缀
+
+    vec2b<test_types::Point> out;
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_TRUE(out.empty());
+}
+
+TEST(BinarySpecialTypes, ArrayCustomStruct_Point)
+{
+    // std::array<Point, 3>：无 count 前缀，总字节 = 3 * 8
+    std::array<test_types::Point, 3> in = {{{1, 2}, {-3, 4}, {0, 0}}};
+
+    char buf[64] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, 3u * 8u);
+
+    std::array<test_types::Point, 3> out = {};
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out, in);
+}
+
+TEST(BinarySpecialTypes, ArrayCustomStruct_Packet)
+{
+    // std::array<Packet, 2>：无 count 前缀，每个 Packet 大小可变（含字符串）
+    std::array<test_types::Packet, 2> in = {{{0x01u, 1u, "hello"}, {0x02u, 2u, ""}}};
+
+    // size() 对单个 Packet 可用（非模板上下文）
+    const size_t expected_bytes = size(in[0]) + size(in[1]);
+
+    char buf[256] = {};
+    Writer w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, in));
+    EXPECT_EQ(w.offset, expected_bytes);
+
+    std::array<test_types::Packet, 2> out = {};
+    Reader r;
+    r.buffer = buf;
+    r.length  = w.offset;
+    EXPECT_TRUE(read(r, out));
+    EXPECT_EQ(out, in);
+}
+
+// ─── 大端字节序验证 ────────────────────────────────────────────────────────
+
+TEST(BinaryBigEndian, UInt16BigEndian)
+{
+    char buf[2] = {};
+    WriterT<true> w;
+    w.buffer = buf;
+    w.length  = 2;
+
+    EXPECT_TRUE(write(w, uint16_t{0x0102}));
+    // 大端：高字节在前
+    EXPECT_EQ(static_cast<uint8_t>(buf[0]), 0x01u);
+    EXPECT_EQ(static_cast<uint8_t>(buf[1]), 0x02u);
+}
+
+TEST(BinaryBigEndian, UInt32BigEndian)
+{
+    char buf[4] = {};
+    WriterT<true> w;
+    w.buffer = buf;
+    w.length  = 4;
+
+    EXPECT_TRUE(write(w, uint32_t{0x01020304u}));
+    EXPECT_EQ(static_cast<uint8_t>(buf[0]), 0x01u);
+    EXPECT_EQ(static_cast<uint8_t>(buf[1]), 0x02u);
+    EXPECT_EQ(static_cast<uint8_t>(buf[2]), 0x03u);
+    EXPECT_EQ(static_cast<uint8_t>(buf[3]), 0x04u);
+}
+
+TEST(BinaryBigEndian, RoundTripBigEndian)
+{
+    char buf[32] = {};
+    WriterT<true> w;
+    w.buffer = buf;
+    w.length  = sizeof(buf);
+    EXPECT_TRUE(write(w, uint64_t{0xDEADBEEFCAFEBABEull}));
+    EXPECT_TRUE(write(w, int32_t{-42}));
+
+    ReaderT<true> r;
+    r.buffer = buf;
+    r.length  = w.offset;
+
+    uint64_t v1 = 0;
+    int32_t  v2 = 0;
+    EXPECT_TRUE(read(r, v1));
+    EXPECT_TRUE(read(r, v2));
+    EXPECT_EQ(v1, 0xDEADBEEFCAFEBABEull);
+    EXPECT_EQ(v2, -42);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
