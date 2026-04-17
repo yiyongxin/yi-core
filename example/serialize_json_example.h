@@ -1,6 +1,6 @@
 #pragma once
 
-#include "serialize/json.h"  // IWYU pragma: keep
+#include "yi/core/serialize/json/json.h"  // IWYU pragma: keep
 
 namespace yi::example
 {
