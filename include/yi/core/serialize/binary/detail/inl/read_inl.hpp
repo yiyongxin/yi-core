@@ -1,10 +1,12 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 #include <cstdint>
 
 #include "tools.h"
+#include "codec.h"
 #include "../detail.h"
 
 namespace yi::serialize::binary
@@ -12,90 +14,170 @@ namespace yi::serialize::binary
 
 namespace detail
 {
-// 数值类型读取
-template<typename v_type>
-inline bool read_number(Reader& reader, v_type& value)
+
+// 数值类型读取：字节序在编译期确定，if constexpr 消除运行时分支
+template<bool BE, string_coding ENC, typename v_type>
+inline bool read_number(BasicReader<BE,ENC>& reader, v_type& value)
 {
   constexpr size_t v_size = sizeof(v_type);
   if (reader.offset + v_size > reader.length)
     return false;
-  const char* point = reader.buffer + reader.offset;
-  if (reader.is_big_endian)
-    value = *reinterpret_cast<const v_type*>(point);
+  const char* p = reader.buffer + reader.offset;
+  if constexpr (BE)
+    value = *reinterpret_cast<const v_type*>(p);
   else
-    value = assemble_le<v_type>(point);
+    value = assemble_le<v_type>(p);
   reader.offset += v_size;
   return true;
 }
-}
-//------------------------------基础类型支持---------------------------------
 
-inline bool read(Reader& reader, uint8_t&  value) { return detail::read_number<uint8_t> (reader, value); }
-inline bool read(Reader& reader, uint16_t& value) { return detail::read_number<uint16_t>(reader, value); }
-inline bool read(Reader& reader, uint32_t& value) { return detail::read_number<uint32_t>(reader, value); }
-inline bool read(Reader& reader, uint64_t& value) { return detail::read_number<uint64_t>(reader, value); }
-inline bool read(Reader& reader, int8_t&   value) { return detail::read_number<int8_t>  (reader, value); }
-inline bool read(Reader& reader, int16_t&  value) { return detail::read_number<int16_t> (reader, value); }
-inline bool read(Reader& reader, int32_t&  value) { return detail::read_number<int32_t> (reader, value); }
-inline bool read(Reader& reader, int64_t&  value) { return detail::read_number<int64_t> (reader, value); }
-inline bool read(Reader& reader, float&    value) { return detail::read_number<float>   (reader, value); }
-inline bool read(Reader& reader, double&   value) { return detail::read_number<double>  (reader, value); }
+} // namespace detail
 
-//-------------------------------字符串支持-------------------------------
+// ── 基础类型 ──────────────────────────────────────────────────────────────
 
-inline bool read(Reader& reader, std::string& value)
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, uint8_t&  v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, uint16_t& v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, uint32_t& v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, uint64_t& v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, int8_t&   v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, int16_t&  v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, int32_t&  v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, int64_t&  v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, float&    v) { return detail::read_number<BE,ENC>(r, v); }
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, double&   v) { return detail::read_number<BE,ENC>(r, v); }
+
+// ── 字符串 ────────────────────────────────────────────────────────────────
+
+template<bool BE, string_coding ENC>
+inline bool read(BasicReader<BE,ENC>& r, std::string& v)
 {
   uint32_t len = 0;
-  if (!read(reader, len))
+  if (!read(r, len))
     return false;
-  if (reader.offset + len > reader.length)
+  if (r.offset + len > r.length)
     return false;
-  value.assign(reader.buffer + reader.offset, len);
-  reader.offset += len;
+  if constexpr (ENC == string_coding::gbk)
+  {
+    if (!detail::gbk_to_utf8(r.buffer + r.offset, len, v))
+      return false;
+  }
+  else
+  {
+    v.assign(r.buffer + r.offset, len);
+  }
+  r.offset += len;
   return true;
 }
 
-template <typename length_type>
-inline bool read(Reader& reader, vstr<length_type>& value)
+template<bool BE, string_coding ENC, typename length_type>
+inline bool read(BasicReader<BE,ENC>& r, vstr<length_type>& v)
 {
-  if (!read(reader, value.length))
+  if (!read(r, v._yi_core_serialize_binary_variable_length))
     return false;
-  if (reader.offset + value.length > reader.length)
+  const size_t len = static_cast<size_t>(v._yi_core_serialize_binary_variable_length);
+  if (r.offset + len > r.length)
     return false;
-  value.data.assign(reader.buffer + reader.offset, value.length);
-  reader.offset += value.length;
+  if constexpr (ENC == string_coding::gbk)
+  {
+    std::string utf8_str;
+    if (!detail::gbk_to_utf8(r.buffer + r.offset, len, utf8_str))
+      return false;
+    v.assign(utf8_str);
+  }
+  else
+  {
+    v.assign(r.buffer + r.offset, len);
+  }
+  r.offset += len;
   return true;
 }
 
-template <size_t N>
-inline bool read(Reader& reader, fstr<N>& value)
+template<bool BE, string_coding ENC, size_t N>
+inline bool read(BasicReader<BE,ENC>& r, fstr<N>& v)
 {
-  if (reader.offset + N > reader.length)
+  if (r.offset + N > r.length)
     return false;
-  value.data.assign(reader.buffer + reader.offset, N);
-  // 去除末尾 null 填充
-  const size_t end = value.data.find('\0');
-  if (end != std::string::npos)
-    value.data.resize(end);
-  reader.offset += N;
+  if constexpr (ENC == string_coding::gbk)
+  {
+    const char* p = r.buffer + r.offset;
+    size_t raw_len = N;
+    for (size_t i = 0; i < N; ++i)
+    {
+      if (p[i] == '\0')
+      {
+        raw_len = i;
+        break;
+      }
+    }
+    if (!detail::gbk_to_utf8(p, raw_len, v))
+      return false;
+  }
+  else
+  {
+    v.assign(r.buffer + r.offset, N);
+    const size_t end = v.find('\0');
+    if (end != std::string::npos)
+      v.resize(end);
+  }
+  r.offset += N;
   return true;
 }
 
-//-------------------------------容器类型支持-------------------------------
+// ── 容器 ──────────────────────────────────────────────────────────────────
 
-template<typename T>
-inline bool read(Reader& reader, std::vector<T>& value)
+template<bool BE, string_coding ENC, typename T>
+inline bool read(BasicReader<BE,ENC>& r, std::vector<T>& v)
 {
   uint32_t cnt = 0;
-  if (!read(reader, cnt))
+  if (!read(r, cnt))
     return false;
-  value.clear();
-  value.reserve(cnt);
-  for (uint32_t i = 0; i < cnt; ++i) {
+  v.clear();
+  v.reserve(cnt);
+  for (uint32_t i = 0; i < cnt; ++i)
+  {
     T item{};
-    if (!read(reader, item))
+    if (!read(r, item))
       return false;
-    value.push_back(std::move(item));
+    v.push_back(std::move(item));
+  }
+  return true;
+}
+
+template<bool BE, string_coding ENC, typename T, typename length_type>
+inline bool read(BasicReader<BE,ENC>& r, vec<T,length_type>& v)
+{
+  length_type cnt{};
+  if (!read(r, cnt))
+    return false;
+  v.clear();
+  v.reserve(static_cast<size_t>(cnt));
+  for (length_type i = 0; i < cnt; ++i)
+  {
+    T item{};
+    if (!read(r, item))
+      return false;
+    v.push_back(std::move(item));
+  }
+  return true;
+}
+
+template<bool BE, string_coding ENC, typename T, size_t N>
+inline bool read(BasicReader<BE,ENC>& r, std::array<T,N>& v)
+{
+  for (auto& item : v)
+  {
+    if (!read(r, item))
+      return false;
   }
   return true;
 }
