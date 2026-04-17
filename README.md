@@ -30,7 +30,7 @@ ctest --output-on-failure
 FetchContent_Declare(yi_core
     GIT_REPOSITORY https://github.com/yiyongxin/yi-core.git
     GIT_TAG v0.0.2
-    SOURCE_DIR ${LOCAL_ROOT}/framework/yi-core   # 工作台本地覆盖
+    SOURCE_DIR ${LOCAL_ROOT}/framework/core   # 工作台本地覆盖
 )
 FetchContent_MakeAvailable(yi_core)
 target_link_libraries(my_target PRIVATE yi::core)
@@ -39,7 +39,7 @@ target_link_libraries(my_target PRIVATE yi::core)
 ## 目录结构
 
 ```
-yi-core/
+core/
 ├── include/yi/
 │   ├── core/
 │   │   ├── common/         基础类型（Bytes、Base64、ByteBuffer）

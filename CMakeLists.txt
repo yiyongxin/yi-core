@@ -26,6 +26,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # 本地联调（覆盖远程依赖）：在下游项目使用 FetchContent 时可设置 SOURCE_DIR 指向本地 yi_core 源码。
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# 第三方依赖: stdexec (NVIDIA/stdexec — C++26 std::execution 参考实现)
+#
+# 提供: exec::task<T>、stdexec::run_loop、stdexec::on、stdexec::then 等
+# 约束: 仅使用 CPU 路径 (STDEXEC::stdexec)，不引入 CUDA/GPU 相关目标
+# ------------------------------------------------------------
+include(FetchContent)
+
+set(STDEXEC_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+set(STDEXEC_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    stdexec
+    GIT_REPOSITORY https://github.com/NVIDIA/stdexec.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+)
+
+FetchContent_MakeAvailable(stdexec)
+
 # Library target
 add_library(yi_core STATIC
     src/placeholder.cpp
@@ -35,6 +55,8 @@ target_include_directories(yi_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(yi_core PUBLIC STDEXEC::stdexec)
 
 add_library(yi::core ALIAS yi_core)
 
@@ -54,9 +76,12 @@ configure_package_config_file(
   INSTALL_DESTINATION lib/cmake/yi_core
 )
 
-install(TARGETS yi_core EXPORT YiCoreTargets)
-install(EXPORT YiCoreTargets FILE YiCoreTargets.cmake DESTINATION lib/cmake/yi_core)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfigVersion.cmake" DESTINATION lib/cmake/yi_core)
+option(YI_CORE_INSTALL "Generate install rules for yi_core" OFF)
+if(YI_CORE_INSTALL)
+    install(TARGETS yi_core EXPORT YiCoreTargets)
+    install(EXPORT YiCoreTargets FILE YiCoreTargets.cmake DESTINATION lib/cmake/yi_core)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/YiCoreConfigVersion.cmake" DESTINATION lib/cmake/yi_core)
+endif()
 
 # Enable tests only when built as top-level project
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
