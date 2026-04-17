@@ -21,4 +21,7 @@ public:
   inline std::string __template_string_encode() const;
 };
 
+// 工作台命名约定别名：yi::common::ByteBuffer → Bytes
+using ByteBuffer = Bytes;
+
 }

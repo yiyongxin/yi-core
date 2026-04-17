@@ -1,0 +1,4 @@
+CompileFlags:
+  Add:
+    - "-std=c++20"
+    - "-I/home/project/yi/yi-workspace/framework/yi-core/include"
