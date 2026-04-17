@@ -69,7 +69,7 @@ inline bool read(BasicReader<BE,ENC>& r, std::string& v)
   if constexpr (ENC == string_coding::gbk)
   {
     if (!detail::gbk_to_utf8(r.buffer + r.offset, len, v))
-      return false;
+      v.assign(r.buffer + r.offset, len);
   }
   else
   {
@@ -91,8 +91,9 @@ inline bool read(BasicReader<BE,ENC>& r, vstr<length_type>& v)
   {
     std::string utf8_str;
     if (!detail::gbk_to_utf8(r.buffer + r.offset, len, utf8_str))
-      return false;
-    v.assign(utf8_str);
+      v.assign(r.buffer + r.offset, len);
+    else
+      v.assign(utf8_str);
   }
   else
   {
@@ -120,7 +121,7 @@ inline bool read(BasicReader<BE,ENC>& r, fstr<N>& v)
       }
     }
     if (!detail::gbk_to_utf8(p, raw_len, v))
-      return false;
+      v.assign(p, raw_len);
   }
   else
   {
