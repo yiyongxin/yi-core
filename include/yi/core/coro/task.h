@@ -5,8 +5,7 @@
 #include <exec/task.hpp>
 // IWYU pragma: end_exports
 
-namespace yi
-{
+namespace yi {
 
 template <typename T = void>
 using Task = exec::task<T>;

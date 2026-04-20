@@ -29,6 +29,7 @@
 //   ConcurrentSubmit        — 多线程并发 submit，所有结果正确
 //   SpawnOnTwoExecutors     — 向两个独立 executor 同时 spawn_on，结果互不干扰
 
+#include "yi/core/coro/context/thread_context.h"
 #include <yi/core/coro/coro.h>
 
 #include <gtest/gtest.h>
@@ -43,7 +44,7 @@
 // 辅助：在独立线程上运行 ThreadExecutor，RAII 析构时 finish + join
 // ---------------------------------------------------------------------------
 struct ExecutorThread {
-    yi::coro::ThreadExecutor exec;
+    yi::coro::ThreadContext exec;
     std::thread              thread;
 
     ExecutorThread()
@@ -57,7 +58,7 @@ struct ExecutorThread {
 };
 
 // ---------------------------------------------------------------------------
-// 测试协程（仅在 ThreadExecutor 归属线程上运行）
+// 测试协程（仅在 ThreadContext 归属线程上运行）
 // ---------------------------------------------------------------------------
 
 yi::Task<void> coro_void() {
@@ -148,7 +149,7 @@ TEST(CoroTask, ExceptionPropagates) {
 // ---------------------------------------------------------------------------
 
 TEST(CoroExecutor, PostRunsOnOwnerThread) {
-    yi::coro::ThreadExecutor exec;
+    yi::coro::ThreadContext exec;
     std::thread::id          owner_id;
     std::thread::id          post_id;
     std::promise<void>       done;
@@ -172,7 +173,7 @@ TEST(CoroExecutor, PostRunsOnOwnerThread) {
 }
 
 TEST(CoroExecutor, FinishStopsLoop) {
-    yi::coro::ThreadExecutor exec;
+    yi::coro::ThreadContext exec;
     std::atomic<bool>        loop_exited{false};
 
     std::thread worker([&] {
@@ -187,7 +188,7 @@ TEST(CoroExecutor, FinishStopsLoop) {
 }
 
 TEST(CoroExecutor, MultiplePostOrdered) {
-    yi::coro::ThreadExecutor exec;
+    yi::coro::ThreadContext exec;
     std::vector<int>         order;
     std::mutex               mtx;
     std::promise<void>       done;
@@ -314,7 +315,7 @@ TEST(CoroTask, NestedExceptionPropagates) {
 // ---------------------------------------------------------------------------
 
 TEST(CoroExecutor, PostBeforeRun) {
-    yi::coro::ThreadExecutor exec;
+    yi::coro::ThreadContext exec;
     std::atomic<int>   counter{0};
     std::promise<void> done;
     auto               done_fut = done.get_future();
@@ -337,7 +338,7 @@ TEST(CoroExecutor, PostBeforeRun) {
 }
 
 TEST(CoroExecutor, PostFromOwnerThread) {
-    yi::coro::ThreadExecutor exec;
+    yi::coro::ThreadContext exec;
     std::atomic<int>   counter{0};
     std::promise<void> done;
     auto               done_fut = done.get_future();

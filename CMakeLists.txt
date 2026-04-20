@@ -58,6 +58,27 @@ target_include_directories(yi_core PUBLIC
 
 target_link_libraries(yi_core PUBLIC STDEXEC::stdexec)
 
+# ------------------------------------------------------------
+# 可选依赖: cpprestsdk HTTP 适配器
+#
+# 启用方式: cmake -DYI_CORE_CPPRESTSDK=ON ..
+# 依赖: libcpprest-dev (apt install libcpprest-dev)
+# ------------------------------------------------------------
+option(YI_CORE_CPPRESTSDK "Enable cpprestsdk coroutine HTTP adapter" OFF)
+if(YI_CORE_CPPRESTSDK)
+    find_package(cpprestsdk QUIET)
+    if(cpprestsdk_FOUND)
+        target_link_libraries(yi_core PUBLIC cpprestsdk::cpprest)
+    else()
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(CPPREST REQUIRED cpprest)
+        target_link_libraries(yi_core PUBLIC ${CPPREST_LIBRARIES})
+        target_include_directories(yi_core PUBLIC ${CPPREST_INCLUDE_DIRS})
+        target_compile_options(yi_core PUBLIC ${CPPREST_CFLAGS_OTHER})
+    endif()
+    target_compile_definitions(yi_core PUBLIC YI_HAS_CPPRESTSDK)
+endif()
+
 add_library(yi::core ALIAS yi_core)
 
 # Packaging helpers
