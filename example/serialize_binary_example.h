@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+using namespace std;
+using namespace yi;
 // ─── 示例结构体 ──────────────────────────────────────────────────────────────
 //
 // 每种结构体演示一类常见场景，搭配下方的 size/read/write 重载即可接入序列化。

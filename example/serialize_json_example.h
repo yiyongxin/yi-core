@@ -2,6 +2,9 @@
 
 #include "yi/core/serialize/json/json.h"  // IWYU pragma: keep
 
+using namespace std;
+using namespace yi;
+
 namespace yi::example
 {
 

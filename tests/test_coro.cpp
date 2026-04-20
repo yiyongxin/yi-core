@@ -34,13 +34,10 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
-#include <chrono>
 #include <stdexec/execution.hpp>
 #include <string>
 #include <thread>
 #include <vector>
-
-using namespace std::chrono_literals;
 
 // ---------------------------------------------------------------------------
 // 辅助：在独立线程上运行 ThreadExecutor，RAII 析构时 finish + join
