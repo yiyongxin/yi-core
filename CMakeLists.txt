@@ -77,6 +77,10 @@ if(YI_CORE_CPPRESTSDK)
         target_compile_options(yi_core PUBLIC ${CPPREST_CFLAGS_OTHER})
     endif()
     target_compile_definitions(yi_core PUBLIC YI_HAS_CPPRESTSDK)
+    target_sources(yi_core PRIVATE
+        src/yi/core/adapter/cpprestsdk/http_client.cpp
+        src/yi/core/adapter/cpprestsdk/http_server.cpp
+    )
 endif()
 
 add_library(yi::core ALIAS yi_core)

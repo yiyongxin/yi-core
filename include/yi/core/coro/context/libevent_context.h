@@ -1,45 +1,42 @@
 #pragma once
 
-// libevent execution context (brief)
+// libevent 执行上下文
+// 头文件不引入任何 libevent 头文件；用户若需调用 libevent API 自行 #include <event2/event.h>。
 
-#include <event2/event.h>
 #include <functional>
 #include <mutex>
 #include <queue>
-
 #include "detail/posting_scheduler.h"
 
-namespace yi::coro 
+struct event_base; // 前向声明，避免引入 libevent 头文件
+
+namespace yi::coro
 {
 
-// Libevent-based execution context. Provides `scheduler()`, `post()`, `run()`, `finish()`.
-// Not copyable.
-class LibeventContext 
+// 基于 libevent event_base 的执行上下文，不可复制/移动。
+class LibeventContext
 {
 public:
-	// Create event_base.
 	LibeventContext();
-	// Destroy event_base (call after run() returned).
 	~LibeventContext();
-public:
-	LibeventContext(const LibeventContext&) = delete;
+	LibeventContext(const LibeventContext&)            = delete;
 	LibeventContext& operator=(const LibeventContext&) = delete;
-	// Return a PostingScheduler bound to this context.
+public:
+	// 返回绑定到本上下文的 stdexec 调度器。
 	detail::PostingScheduler<LibeventContext> scheduler() noexcept;
-	// Run event loop on calling thread (blocks until finish()).
+	// 在调用线程上运行事件循环，阻塞直到 finish()。
 	void run();
-	// Request loop stop (thread-safe).
+	// 请求停止事件循环，线程安全。
 	void finish();
-	// 将任务投递到事件循环线程执行（线程安全）。
+	// 将任务投递到事件循环线程执行，线程安全。
 	void post(std::function<void()> fn);
-	// 返回底层 event_base*（在 finish() 前请删除已注册的事件）。
+	// 返回底层 event_base*，finish() 前须先关闭已注册的事件。
 	event_base* base() noexcept;
 private:
-	// Callback executing pending tasks.
-	static void on_dispatch(evutil_socket_t fd, short what, void* arg);	
+	void drain_(); // 供内部 libevent 回调消费 pending_ 队列
 private:
-	event_base* base_;
-	std::mutex mutex_;
+	event_base*                       base_;
+	std::mutex                        mutex_;
 	std::queue<std::function<void()>> pending_;
 };
 
